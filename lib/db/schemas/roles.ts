@@ -8,8 +8,8 @@ description: varchar('description', { length: 255 }).notNull(),
 active: boolean().default(true).notNull()
 })
 
-export type Roles = typeof roles.$inferSelect;
-export type NewRoles = typeof roles.$inferInsert;  
+export type Role = typeof roles.$inferSelect;
+export type NewRole = typeof roles.$inferInsert;  
 
 
 
