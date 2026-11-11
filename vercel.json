@@ -1,3 +1,4 @@
 {
+    "installCommand": "git config --global url.\"https://x-access-token:${GITHUB_TOKEN}@github.com/\".insteadOf \"https://github.com/\" && pnpm install",
     "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"main\" ] || [ \"$VERCEL_GIT_COMMIT_REF\" = \"develop\" ]; then exit 1; else exit 0; fi"
 }
