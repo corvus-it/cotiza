@@ -5,3 +5,5 @@ export * from './companies';
 export * from './serviceTypes';
 export * from './vehicles';
 export * from './clientVechicle';
+export * from './budgets';
+export * from './budgetDetails';

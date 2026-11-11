@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AntdRegistry } from "@ant-design/nextjs-registry";
+import { Suspense } from "react";
+import { AppShell } from "./components/app-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,10 +23,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full">
+        <Suspense fallback={<main>{children}</main>}>
+          <AntdRegistry>
+            <AppShell>{children}</AppShell>
+          </AntdRegistry>
+        </Suspense>
+      </body>
     </html>
   );
 }
