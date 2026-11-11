@@ -1,5 +1,5 @@
 "use client";
-import { Layout, Menu } from "antd";
+import { App, Layout, Menu } from "antd";
 import { CarIcon, ChevronDownIcon, FileTextIcon, HouseIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,6 +31,7 @@ export function AppShell({ children }: AppShellProps) {
   const selectedNavKey = getSelectedNavKey(pathname);
 
   return (
+    <App>
     <Layout style={{ minHeight: "100vh" }}>
       <Header>
         <Menu
@@ -61,5 +62,6 @@ export function AppShell({ children }: AppShellProps) {
         </Layout>
       </Layout>
     </Layout>
+    </App>
   );
 }
