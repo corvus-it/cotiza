@@ -1,0 +1,85 @@
+.page {
+	padding: clamp(16px, 3vw, 32px);
+	max-width: 1440px;
+}
+.narrow {
+	max-width: 960px;
+}
+
+.header {
+	margin-bottom: 20px;
+}
+.back {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	margin-bottom: 6px;
+	margin-left: -4px;
+	padding: 2px 4px;
+	border-radius: 6px;
+	font-size: 14px;
+	color: var(--ink-2);
+	text-decoration: none;
+}
+.back:hover {
+	color: var(--primary);
+}
+.back:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 1px;
+}
+.titleRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 12px 24px;
+}
+.titleBlock {
+	min-width: 0;
+	flex: 1 1 320px;
+}
+.titleLine {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+}
+.title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: clamp(28px, 3vw, 36px);
+	line-height: 1.1;
+	letter-spacing: -0.015em;
+	color: var(--ink);
+	overflow-wrap: anywhere;
+}
+.description {
+	margin: 6px 0 0;
+	max-width: 65ch;
+	font-size: 15px;
+	color: var(--ink-2);
+}
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.panel {
+	padding: 20px;
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: 12px;
+	min-width: 0;
+}
+.flush {
+	padding: 0;
+	overflow: hidden;
+}
+@media (max-width: 575px) {
+	.panel {
+		padding: 16px;
+	}
+}

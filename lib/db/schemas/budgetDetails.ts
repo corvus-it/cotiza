@@ -18,6 +18,11 @@ export const budgetDetails = pgTable(
 		serviceTypeId: integer("service_type_id")
 			.notNull()
 			.references(() => serviceTypes.id),
+		/** Ver `.harness/sql/003_budget_details_category.sql`: 'repuesto' | 'mano_obra' | 'otro'. */
+		category: varchar("category", { length: 20 })
+			.$type<"repuesto" | "mano_obra" | "otro">()
+			.default("otro")
+			.notNull(),
 		description: varchar("description", { length: 255 }).notNull(),
 		quantity: numeric("quantity", { precision: 10, scale: 2, mode: "number" })
 			.default(1)
@@ -35,6 +40,10 @@ export const budgetDetails = pgTable(
 		index("idx_budget_details_service_type_id").on(table.serviceTypeId),
 		check("budget_details_quantity_check", sql`${table.quantity} > 0`),
 		check("budget_details_unit_amount_check", sql`${table.unitAmount} >= 0`),
+		check(
+			"budget_details_category_check",
+			sql`${table.category} IN ('repuesto', 'mano_obra', 'otro')`,
+		),
 	],
 );
 

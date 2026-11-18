@@ -1,54 +1,97 @@
 import "server-only";
-import { and, asc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, eq, exists, ilike, or } from "drizzle-orm";
+import { authorize } from "@/lib/auth/authorize";
+import { vehiclesByClient, type AssignedVehicle } from "@/lib/client-vehicles/assignments";
 import { db } from "@/lib/db";
-import { clients, type Client } from "@/lib/db/schemas";
+import { clients, clientVehicles, vehicles, type Client } from "@/lib/db/schemas";
+
+export type ClientWithVehicles = Pick<Client, "id" | "rut" | "name" | "email" | "phone"> & {
+	/** Vehículos activos del cliente. */
+	vehicles: AssignedVehicle[];
+};
+
+export type ClientOption = { id: number; name: string; rut: string };
+
+const clientFields = {
+	id: clients.id,
+	rut: clients.rut,
+	name: clients.name,
+	email: clients.email,
+	phone: clients.phone,
+};
 
 /** Escapa los comodines de LIKE para buscar el texto literal. */
 function likePattern(text: string): string {
 	return `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }
 
-/** Clientes activos, ordenados por nombre. `q` filtra por RUT, nombre o correo. */
-export async function listClients(q?: string): Promise<Client[]> {
+async function withVehicles(rows: Omit<ClientWithVehicles, "vehicles">[]): Promise<ClientWithVehicles[]> {
+	const byClient = await vehiclesByClient(rows.map((r) => r.id));
+	return rows.map((row) => ({ ...row, vehicles: byClient.get(row.id) ?? [] }));
+}
+
+/*
+ * Todas las consultas se limitan a la empresa de la sesión (`authorize`): el
+ * `companyId` no se recibe como parámetro, así ningún llamador puede pedir
+ * datos de otra empresa.
+ */
+
+/** Clientes activos de la empresa, por nombre. `q` filtra por RUT, nombre, correo o patente. */
+export async function listClients(q?: string): Promise<ClientWithVehicles[]> {
+	const { companyId } = await authorize();
 	const term = q?.trim();
-	const filters = [eq(clients.active, true)];
+	const filters = [eq(clients.companyId, companyId), eq(clients.active, true)];
 
 	if (term) {
 		const pattern = likePattern(term);
-		// El RUT se guarda sin puntos: también se busca sin ellos.
-		const rutPattern = likePattern(term.replace(/\./g, ""));
+		const plateMatches = db
+			.select({ id: clientVehicles.id })
+			.from(clientVehicles)
+			.innerJoin(vehicles, eq(vehicles.id, clientVehicles.vehicleId))
+			.where(
+				and(
+					eq(clientVehicles.clientId, clients.id),
+					eq(vehicles.active, true),
+					// La patente se guarda sin espacios, puntos ni guiones.
+					ilike(vehicles.plate, likePattern(term.replace(/[\s.\-·]/g, ""))),
+				),
+			);
 		filters.push(
 			or(
 				ilike(clients.name, pattern),
 				ilike(clients.email, pattern),
-				ilike(clients.rut, rutPattern),
+				// El RUT se guarda sin puntos: también se busca sin ellos.
+				ilike(clients.rut, likePattern(term.replace(/\./g, ""))),
+				exists(plateMatches),
 			)!,
 		);
 	}
 
-	return db
-		.select()
+	const rows = await db
+		.select(clientFields)
 		.from(clients)
 		.where(and(...filters))
 		.orderBy(asc(clients.name), asc(clients.id));
+	return withVehicles(rows);
 }
 
-/** Cliente activo por id, o `null` si no existe o fue eliminado. */
-export async function getActiveClient(id: number): Promise<Client | null> {
-	const [row] = await db
-		.select()
+/** Cliente activo de la empresa por id (con sus vehículos activos), o `null`. */
+export async function getActiveClient(id: number): Promise<ClientWithVehicles | null> {
+	const { companyId } = await authorize();
+	const rows = await db
+		.select(clientFields)
 		.from(clients)
-		.where(and(eq(clients.id, id), eq(clients.active, true)))
+		.where(and(eq(clients.id, id), eq(clients.companyId, companyId), eq(clients.active, true)))
 		.limit(1);
-	return row ?? null;
+	return (await withVehicles(rows))[0] ?? null;
 }
 
-/** Máximo de una columna `integer` (int4) de PostgreSQL. */
-const PG_INT_MAX = 2_147_483_647;
-
-export function parseClientId(raw: unknown): number | null {
-	const value = typeof raw === "string" ? raw : String(raw ?? "");
-	if (!/^\d+$/.test(value)) return null;
-	const id = Number(value);
-	return Number.isSafeInteger(id) && id > 0 && id <= PG_INT_MAX ? id : null;
+/** Clientes activos de la empresa para los selectores. */
+export async function listClientOptions(): Promise<ClientOption[]> {
+	const { companyId } = await authorize();
+	return db
+		.select({ id: clients.id, name: clients.name, rut: clients.rut })
+		.from(clients)
+		.where(and(eq(clients.companyId, companyId), eq(clients.active, true)))
+		.orderBy(asc(clients.name), asc(clients.id));
 }

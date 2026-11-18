@@ -1,0 +1,109 @@
+.page {
+	display: grid;
+	grid-template-columns: minmax(320px, 5fr) 7fr;
+	min-height: 100vh;
+	background: var(--paper);
+}
+
+/* ---------- Lado de marca ---------- */
+.brandSide {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 20px;
+	padding: 48px clamp(32px, 5vw, 72px);
+	background: var(--graphite);
+	color: var(--graphite-ink);
+	overflow: hidden;
+}
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+.wordmark {
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-size: clamp(34px, 3.6vw, 48px);
+	line-height: 1;
+	color: #fff;
+	white-space: nowrap;
+}
+.wordmarkProduct {
+	font-weight: 500;
+	color: var(--signal);
+}
+.pitch {
+	margin: 0;
+	max-width: 26ch;
+	font-family: var(--font-display);
+	font-weight: 500;
+	font-size: clamp(22px, 2.2vw, 28px);
+	line-height: 1.2;
+	color: var(--graphite-ink);
+}
+/* Franja amarilla en el borde: la misma marca de la sección activa del menú. */
+.stripe {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 6px;
+	background: var(--signal);
+}
+
+/* ---------- Formulario ---------- */
+.formSide {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 48px 24px;
+}
+.formBox {
+	width: 100%;
+	max-width: 400px;
+}
+.title {
+	margin: 0 0 8px;
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: 34px;
+	line-height: 1.1;
+	color: var(--ink);
+}
+.subtitle {
+	margin: 0 0 28px;
+	font-size: 15px;
+	color: var(--ink-2);
+}
+.help {
+	margin: 24px 0 0;
+	font-size: 13.5px;
+	color: var(--ink-2);
+}
+
+@media (max-width: 860px) {
+	.page {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto 1fr;
+	}
+	.brandSide {
+		padding: 28px 24px;
+		gap: 12px;
+	}
+	.pitch {
+		font-size: 18px;
+		max-width: none;
+	}
+	.stripe {
+		top: auto;
+		left: 0;
+		width: auto;
+		height: 4px;
+	}
+	.formSide {
+		align-items: flex-start;
+		padding: 32px 20px 48px;
+	}
+}

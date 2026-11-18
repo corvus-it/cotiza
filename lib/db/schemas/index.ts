@@ -7,3 +7,4 @@ export * from './vehicles';
 export * from './clientVechicle';
 export * from './budgets';
 export * from './budgetDetails';
+export * from './sessions';

@@ -1,21 +1,35 @@
-import { connection } from "next/server";
+import type { Metadata } from "next";
 import { Suspense } from "react";
+import { LoadingFallback } from "@/app/components/loading-fallback";
+import { Page } from "@/app/components/page-layout";
 import { createClient } from "@/lib/actions/clients";
+import { listVehicleOptions } from "@/lib/vehicles/queries";
 import { ClientForm } from "../_components/client-form";
-import { LoadingFallback } from "../_components/loading-fallback";
+
+export const metadata: Metadata = { title: "Nuevo cliente" };
 
 export default function NewClientPage() {
 	return (
-		<main style={{ padding: 24 }}>
+		<Page
+			width="narrow"
+			title="Nuevo cliente"
+			description="El RUT y el nombre son obligatorios. Puedes asignarle vehículos ahora o más tarde."
+			back={{ href: "/clients", label: "Clientes" }}
+		>
 			<Suspense fallback={<LoadingFallback />}>
 				<NewClientForm />
 			</Suspense>
-		</main>
+		</Page>
 	);
 }
 
-/** antd Form lee `Date.now()` al renderizar: se renderiza por petición, no en el prerender. */
 async function NewClientForm() {
-	await connection();
-	return <ClientForm title="Nuevo cliente" submitLabel="Crear cliente" action={createClient} />;
+	const vehicles = await listVehicleOptions();
+	return (
+		<ClientForm
+			submitLabel="Crear cliente"
+			vehicles={vehicles}
+			action={createClient}
+		/>
+	);
 }

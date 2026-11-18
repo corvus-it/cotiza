@@ -8,9 +8,11 @@ import {
 	numeric,
 	pgTable,
 	text,
+	unique,
 	varchar,
 } from "drizzle-orm/pg-core";
 import { clients } from "./clients";
+import { companies } from "./companies";
 import { users } from "./users";
 import { vehicles } from "./vehicles";
 
@@ -22,16 +24,18 @@ const amount = (name: string) =>
  * Mapeo de la tabla existente `budgets` (no se gestiona con drizzle-kit).
  * Nota: en la BD real NO existen FKs sobre client_id/vehicle_id/user_id; los
  * `.references()` solo documentan la relación (inocuos para lectura).
- * `code` y `budget_number` sí son UNIQUE en la BD.
+ * `code` y `budget_number` son UNIQUE por empresa (ver 006_login_multiempresa.sql).
  */
 export const budgets = pgTable(
 	"budgets",
 	{
 		id: integer().primaryKey().generatedAlwaysAsIdentity(),
-		code: varchar("code", { length: 30 }).notNull().unique("budgets_code_key"),
-		budgetNumber: integer("budget_number")
+		// Empresa dueña del presupuesto (no se deduce del usuario: un usuario puede cambiar de empresa).
+		companyId: integer("company_id")
 			.notNull()
-			.unique("budgets_budget_number_key"),
+			.references(() => companies.id),
+		code: varchar("code", { length: 30 }).notNull(),
+		budgetNumber: integer("budget_number").notNull(),
 		clientId: integer("client_id")
 			.notNull()
 			.references(() => clients.id),
@@ -57,6 +61,8 @@ export const budgets = pgTable(
 		active: boolean().default(true).notNull(),
 	},
 	(table) => [
+		unique("budgets_company_id_code_key").on(table.companyId, table.code),
+		unique("budgets_company_id_budget_number_key").on(table.companyId, table.budgetNumber),
 		index("idx_budgets_client_id").on(table.clientId),
 		index("idx_budgets_vehicle_id").on(table.vehicleId),
 		index("idx_budgets_user_id").on(table.userId),

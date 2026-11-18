@@ -6,7 +6,7 @@ export const users = pgTable(
 	{
 		id: integer().primaryKey().generatedAlwaysAsIdentity(),
 		name: varchar("name", { length: 150 }).notNull(),
-		email: varchar("email", { length: 150 }).notNull(),
+		email: varchar("email", { length: 150 }).notNull().unique("users_email_key"),
 		passwordHash: varchar("password_hash", { length: 255 }).notNull(),
 		rolId: integer("role_id").notNull(),
 		// Nullable: ver .harness/sql/001_users_company_id.sql (null = "sin empresa").

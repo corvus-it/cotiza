@@ -1,8 +1,9 @@
-import 'server-only';
-import { cache } from 'react';
-import { and, eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { roles, users } from '@/lib/db/schemas';
+import "server-only";
+import { and, eq, gt } from "drizzle-orm";
+import { cache } from "react";
+import { db } from "@/lib/db";
+import { roles, sessions, users } from "@/lib/db/schemas";
+import { currentSessionId } from "./session";
 
 export type CurrentUser = {
 	id: number;
@@ -12,34 +13,16 @@ export type CurrentUser = {
 	companyId: number | null;
 };
 
-/** Máximo de una columna `integer` (int4) de PostgreSQL. */
-const PG_INT_MAX = 2_147_483_647;
-
-function parseDevUserId(raw: string | undefined): number | null {
-	const value = raw?.trim();
-	if (!value || !/^\d+$/.test(value)) return null;
-	const id = Number(value);
-	if (!Number.isSafeInteger(id) || id <= 0 || id > PG_INT_MAX) return null;
-	return id;
-}
-
 /**
- * Usuario actual de la petición.
- *
- * TODO(auth): provisional hasta tener login. Hoy se resuelve desde la variable
- * de entorno `DEV_USER_ID`; al integrar autenticación real solo cambia esta
- * función (p. ej. leer y verificar la sesión desde cookies).
- *
- * Devuelve `null` si `DEV_USER_ID` falta o no es un entero positivo, o si el
- * usuario no existe, está inactivo (`active = false`) o no tiene rol válido.
- * `companyId` puede ser `null` ("sin empresa").
+ * Usuario de la sesión actual (cookie `cg_session`), o `null` si no hay
+ * sesión, venció, o el usuario está inactivo o sin rol válido.
  *
  * Se deduplica por petición con `React.cache`. No envolver en `'use cache'`:
- * el resultado depende del usuario.
+ * el resultado depende de la cookie.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-	const id = parseDevUserId(process.env.DEV_USER_ID);
-	if (id === null) return null;
+	const sessionId = await currentSessionId();
+	if (!sessionId) return null;
 
 	const [row] = await db
 		.select({
@@ -49,10 +32,10 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 			roleCode: roles.code,
 			companyId: users.companyId,
 		})
-		.from(users)
-		// Sin FKs en BD: un rol inexistente deja al usuario sin resolver.
+		.from(sessions)
+		.innerJoin(users, eq(users.id, sessions.userId))
 		.innerJoin(roles, eq(roles.id, users.rolId))
-		.where(and(eq(users.id, id), eq(users.active, true)))
+		.where(and(eq(sessions.id, sessionId), gt(sessions.expiresAt, new Date()), eq(users.active, true)))
 		.limit(1);
 
 	return row ?? null;

@@ -1,20 +1,15 @@
 "use client";
 
-import { App, Button, Flex, Input, Popconfirm, Space, Table, type TableColumnsType } from "antd";
+import { App, Button, Flex, Input, Popconfirm, Space, Table, Tag, Typography, type TableColumnsType } from "antd";
 import { formatearRut } from "cotizacion-cl";
-import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { deleteClient } from "@/lib/actions/clients";
+import type { ClientWithVehicles } from "@/lib/clients/queries";
 
-export type ClientRow = {
-	id: number;
-	rut: string;
-	name: string;
-	email: string | null;
-	phone: string | null;
-};
+type ClientRow = ClientWithVehicles;
 
 type ClientsTableProps = {
 	clients: ClientRow[];
@@ -48,6 +43,22 @@ export function ClientsTable({ clients, query }: ClientsTableProps) {
 		{ title: "Nombre", dataIndex: "name" },
 		{ title: "Correo", dataIndex: "email", render: (v: string | null) => v ?? "—" },
 		{ title: "Teléfono", dataIndex: "phone", render: (v: string | null) => v ?? "—" },
+		{
+			title: "Vehículos",
+			dataIndex: "vehicles",
+			render: (vehicles: ClientRow["vehicles"]) =>
+				vehicles.length > 0 ? (
+					<Flex gap={4} wrap>
+						{vehicles.map((vehicle) => (
+							<Link key={vehicle.id} href={`/vehicles/${vehicle.id}`}>
+								<Tag style={{ marginInlineEnd: 0, cursor: "pointer" }}>{vehicle.plate}</Tag>
+							</Link>
+						))}
+					</Flex>
+				) : (
+					<Typography.Text type="secondary">—</Typography.Text>
+				),
+		},
 		{
 			title: "Acciones",
 			key: "actions",
@@ -83,17 +94,12 @@ export function ClientsTable({ clients, query }: ClientsTableProps) {
 				<Input.Search
 					key={query}
 					defaultValue={query}
-					placeholder="Buscar por RUT, nombre o correo"
+					placeholder="Buscar por RUT, nombre, correo o patente"
 					allowClear
 					loading={searching}
 					onSearch={onSearch}
 					style={{ maxWidth: 360 }}
 				/>
-				<Link href="/clients/new-client">
-					<Button type="primary" icon={<PlusIcon size={16} />}>
-						Nuevo cliente
-					</Button>
-				</Link>
 			</Flex>
 			<Table<ClientRow>
 				rowKey="id"
@@ -102,7 +108,7 @@ export function ClientsTable({ clients, query }: ClientsTableProps) {
 				loading={searching || deleting}
 				pagination={{ pageSize: 20, hideOnSinglePage: true }}
 				locale={{ emptyText: query ? "Sin resultados para la búsqueda." : "Aún no hay clientes." }}
-				scroll={{ x: 720 }}
+				scroll={{ x: 860 }}
 			/>
 		</Flex>
 	);
