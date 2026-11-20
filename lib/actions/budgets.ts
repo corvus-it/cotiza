@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { CotizacionError, crearCotizacion, type Cotizacion } from "cotizacion-cl";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
@@ -232,7 +232,7 @@ export async function createBudget(input: unknown): Promise<BudgetActionState> {
 	redirect(`/budgets/${encodeURIComponent(code)}`);
 }
 
-/** Modifica un presupuesto no anulado de la empresa; reemplaza sus líneas. */
+/** Modifica un presupuesto no anulado ni aceptado de la empresa; reemplaza sus líneas. */
 export async function updateBudget(rawCode: unknown, input: unknown): Promise<BudgetActionState> {
 	const access = await getBudgetAccess();
 	if (!access.ok) return NO_ACCESS[access.reason];
@@ -244,12 +244,14 @@ export async function updateBudget(rawCode: unknown, input: unknown): Promise<Bu
 
 	try {
 		const [current] = await db
-			.select({ id: budgets.id, active: budgets.active })
+			.select({ id: budgets.id, active: budgets.active, acceptedAt: budgets.acceptedAt })
 			.from(budgets)
 			.where(and(eq(budgets.code, rawCode), ofCompany(access.company.id)))
 			.limit(1);
 		if (!current) return { ok: false, message: "El presupuesto no existe." };
 		if (!current.active) return { ok: false, message: "El presupuesto está anulado y no se puede modificar." };
+		if (current.acceptedAt)
+			return { ok: false, message: "El presupuesto está aceptado. Revierte la aceptación para modificarlo." };
 
 		const used = await db
 			.select({ id: budgetDetails.serviceTypeId })
@@ -269,7 +271,7 @@ export async function updateBudget(rawCode: unknown, input: unknown): Promise<Bu
 			db
 				.update(budgets)
 				.set(budgetValues(data, quoted.totals))
-				.where(and(eq(budgets.id, current.id), eq(budgets.active, true))),
+				.where(and(eq(budgets.id, current.id), eq(budgets.active, true), isNull(budgets.acceptedAt))),
 			db.delete(budgetDetails).where(eq(budgetDetails.budgetId, current.id)),
 			db.insert(budgetDetails).values(
 				data.lines.map((line) => ({ ...line, budgetId: current.id })),
@@ -283,7 +285,7 @@ export async function updateBudget(rawCode: unknown, input: unknown): Promise<Bu
 	redirect(`/budgets/${encodeURIComponent(rawCode)}`);
 }
 
-/** Borrado lógico: anula el presupuesto (`active = false`). */
+/** Borrado lógico: anula el presupuesto (`active = false`), también si está aceptado. */
 export async function annulBudget(rawCode: unknown): Promise<BudgetActionState> {
 	const access = await getBudgetAccess();
 	if (!access.ok) return NO_ACCESS[access.reason];
@@ -299,6 +301,69 @@ export async function annulBudget(rawCode: unknown): Promise<BudgetActionState> 
 	} catch (error) {
 		console.error("annulBudget", error);
 		return { ok: false, message: "No se pudo anular el presupuesto. Inténtalo de nuevo." };
+	}
+
+	refresh();
+	return { ok: true };
+}
+
+/**
+ * Marca el presupuesto como aceptado por el cliente. Solo un presupuesto activo
+ * (vigente o vencido: el cliente puede aceptar fuera de plazo) y no aceptado.
+ */
+export async function acceptBudget(rawCode: unknown): Promise<BudgetActionState> {
+	const access = await getBudgetAccess();
+	if (!access.ok) return NO_ACCESS[access.reason];
+	if (typeof rawCode !== "string" || !rawCode) return { ok: false, message: "Presupuesto inválido." };
+
+	try {
+		const updated = await db
+			.update(budgets)
+			.set({ acceptedAt: sql`now()`, acceptedBy: access.user.id })
+			.where(
+				and(
+					eq(budgets.code, rawCode),
+					eq(budgets.active, true),
+					isNull(budgets.acceptedAt),
+					ofCompany(access.company.id),
+				),
+			)
+			.returning({ id: budgets.id });
+		if (updated.length === 0)
+			return { ok: false, message: "El presupuesto no existe, está anulado o ya fue aceptado." };
+	} catch (error) {
+		console.error("acceptBudget", error);
+		return { ok: false, message: "No se pudo marcar como aceptado. Inténtalo de nuevo." };
+	}
+
+	refresh();
+	return { ok: true };
+}
+
+/** Revierte la aceptación (p. ej. marcada por error): vuelve a vigente o vencido. */
+export async function unacceptBudget(rawCode: unknown): Promise<BudgetActionState> {
+	const access = await getBudgetAccess();
+	if (!access.ok) return NO_ACCESS[access.reason];
+	if (typeof rawCode !== "string" || !rawCode) return { ok: false, message: "Presupuesto inválido." };
+
+	try {
+		const updated = await db
+			.update(budgets)
+			.set({ acceptedAt: null, acceptedBy: null })
+			.where(
+				and(
+					eq(budgets.code, rawCode),
+					eq(budgets.active, true),
+					isNotNull(budgets.acceptedAt),
+					ofCompany(access.company.id),
+				),
+			)
+			.returning({ id: budgets.id });
+		if (updated.length === 0)
+			return { ok: false, message: "El presupuesto no existe, está anulado o no está aceptado." };
+	} catch (error) {
+		console.error("unacceptBudget", error);
+		return { ok: false, message: "No se pudo revertir la aceptación. Inténtalo de nuevo." };
 	}
 
 	refresh();

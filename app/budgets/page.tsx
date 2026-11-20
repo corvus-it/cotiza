@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { LoadingFallback } from "@/app/components/loading-fallback";
 import { Page, Panel } from "@/app/components/page-layout";
 import { getBudgetAccess, getCompanyBudgets } from "@/lib/budgets/queries";
+import { ADMIN_ROLE } from "@/lib/company/validation";
 import { AccessAlert } from "./_components/access-alert";
 import { BudgetsTable } from "./_components/budgets-table";
 
@@ -38,5 +39,11 @@ async function BudgetsList({ searchParams }: Pick<PageProps<"/budgets">, "search
 	if (!access.ok) return <AccessAlert reason={access.reason} />;
 
 	const list = await getCompanyBudgets(access.company.id, { search: q, status, page });
-	return <BudgetsTable list={list} />;
+	return (
+		<BudgetsTable
+			list={list}
+			companyEmailMissing={!access.company.email?.trim()}
+			isAdmin={access.user.roleCode === ADMIN_ROLE}
+		/>
+	);
 }

@@ -5,6 +5,7 @@ import { PencilIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { ExportButton } from "@/app/components/export-button";
 import { deleteVehicle } from "@/lib/actions/vehicles";
 import type { VehicleWithClients } from "@/lib/vehicles/queries";
 
@@ -107,6 +108,7 @@ export function VehiclesTable({ vehicles, query }: VehiclesTableProps) {
 					onSearch={onSearch}
 					style={{ maxWidth: 380 }}
 				/>
+				<ExportButton href="/vehicles/export" params={{ q: query }} disabled={vehicles.length === 0} />
 			</Flex>
 			<Table<VehicleWithClients>
 				rowKey="id"

@@ -12,6 +12,7 @@ import {
 	listServiceTypes,
 } from "@/lib/budgets/queries";
 import { listClientOptions } from "@/lib/clients/queries";
+import { ADMIN_ROLE } from "@/lib/company/validation";
 import { AccessAlert } from "../_components/access-alert";
 import { AnnulButton } from "../_components/annul-button";
 import { BudgetHeader } from "../_components/budget-header";
@@ -54,7 +55,8 @@ async function Budget({ params }: Pick<PageProps<"/budgets/[budgetCode]">, "para
 			ownerIds: [],
 		});
 
-	const readOnly = budget.status === "anulado";
+	const annulled = budget.status === "anulado";
+	const readOnly = annulled || budget.status === "aceptado";
 
 	return (
 		<Flex vertical gap="middle">
@@ -64,9 +66,22 @@ async function Budget({ params }: Pick<PageProps<"/budgets/[budgetCode]">, "para
 				status={budget.status}
 				userName={budget.userName}
 				expiresOn={budget.expiresOn}
+				acceptedAt={budget.acceptedAt}
+				clientEmail={budget.clientEmail}
+				companyEmailMissing={!access.company.email?.trim()}
+				isAdmin={access.user.roleCode === ADMIN_ROLE}
+				lastSent={budget.lastSent}
 			/>
 			{readOnly && (
-				<Alert type="info" showIcon title="Este presupuesto está anulado y no se puede modificar." />
+				<Alert
+					type="info"
+					showIcon
+					title={
+						annulled
+							? "Este presupuesto está anulado y no se puede modificar."
+							: "Este presupuesto fue aceptado por el cliente. Revierte la aceptación para modificarlo."
+					}
+				/>
 			)}
 			<BudgetForm
 				submitLabel="Guardar cambios"
@@ -74,7 +89,7 @@ async function Budget({ params }: Pick<PageProps<"/budgets/[budgetCode]">, "para
 				vehicles={vehicles}
 				serviceTypes={serviceTypes}
 				readOnly={readOnly}
-				extraActions={readOnly ? undefined : <AnnulButton code={budget.code} />}
+				extraActions={annulled ? undefined : <AnnulButton code={budget.code} />}
 				action={updateBudget.bind(null, budget.code)}
 				initialValues={{
 					clientId: budget.clientId,

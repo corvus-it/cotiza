@@ -11,16 +11,22 @@ import {
 	Space,
 	Table,
 	Tag,
+	Tooltip,
 	type TableColumnsType,
 } from "antd";
-import { BanIcon } from "lucide-react";
+import { BanIcon, FileDownIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { ExportButton } from "@/app/components/export-button";
 import { annulBudget } from "@/lib/actions/budgets";
+import { budgetPdfHref } from "@/lib/budgets/links";
 import type { BudgetList, BudgetListItem } from "@/lib/budgets/queries";
 import { BUDGET_STATUSES, type BudgetStatus } from "@/lib/budgets/status";
 import { formatCLP, formatDate } from "@/lib/format";
+import { AcceptButton } from "./accept-button";
+import { SendBudgetButton } from "./send-budget-button";
+import { SentTag } from "./sent-tag";
 
 const statusOptions = [
 	{ value: "", label: "Todos los estados" },
@@ -30,7 +36,14 @@ const statusOptions = [
 	})),
 ];
 
-export function BudgetsTable({ list }: { list: BudgetList }) {
+type BudgetsTableProps = {
+	list: BudgetList;
+	/** Sin correo de la empresa no se puede enviar (ver «Mi empresa»). */
+	companyEmailMissing: boolean;
+	isAdmin: boolean;
+};
+
+export function BudgetsTable({ list, companyEmailMissing, isAdmin }: BudgetsTableProps) {
 	const { message } = App.useApp();
 	const router = useRouter();
 	const pathname = usePathname();
@@ -84,29 +97,67 @@ export function BudgetsTable({ list }: { list: BudgetList }) {
 			render: (v: number) => <strong>{formatCLP(v)}</strong>,
 		},
 		{
+			// Estado del presupuesto y, debajo, si ya se envió por correo.
 			title: "Estado",
-			dataIndex: "status",
-			render: (status: BudgetStatus) => (
-				<Tag color={BUDGET_STATUSES[status].color}>{BUDGET_STATUSES[status].label}</Tag>
+			key: "status",
+			render: (_, item) => (
+				<Flex vertical gap={4} align="flex-start">
+					<Tag color={BUDGET_STATUSES[item.status].color}>{BUDGET_STATUSES[item.status].label}</Tag>
+					{item.lastSent ? (
+						<SentTag lastSent={item.lastSent} />
+					) : (
+						// En un anulado ya no se enviará: «No enviado» solo sería ruido.
+						item.status !== "anulado" && <Tag>No enviado</Tag>
+					)}
+				</Flex>
 			),
 		},
 		{
 			title: "Acciones",
 			key: "actions",
 			align: "right",
-			render: (_, item) =>
-				item.status === "anulado" ? null : (
-					<Popconfirm
-						title="Anular presupuesto"
-						description={`¿Anular el presupuesto ${item.code}? No se podrá modificar.`}
-						okText="Anular"
-						cancelText="Cancelar"
-						okButtonProps={{ danger: true }}
-						onConfirm={() => onAnnul(item)}
-					>
-						<Button danger icon={<BanIcon size={16} />} aria-label={`Anular ${item.code}`} />
-					</Popconfirm>
-				),
+			// 4 botones de 32 px + separación + relleno de la celda; fija a la
+			// derecha para tenerla a mano al desplazar la tabla.
+			width: 200,
+			fixed: "right",
+			render: (_, item) => (
+				<Space size="small">
+					<Tooltip title="Ver PDF">
+						<Button
+							href={budgetPdfHref(item.code)}
+							target="_blank"
+							rel="noopener"
+							icon={<FileDownIcon size={16} aria-hidden />}
+							aria-label={`Ver PDF de ${item.code}`}
+						/>
+					</Tooltip>
+					{item.status !== "anulado" && (
+						<SendBudgetButton
+							compact
+							code={item.code}
+							clientEmail={item.clientEmail}
+							companyEmailMissing={companyEmailMissing}
+							isAdmin={isAdmin}
+							lastSent={item.lastSent}
+						/>
+					)}
+					{item.status !== "anulado" && (
+						<AcceptButton compact code={item.code} accepted={item.status === "aceptado"} />
+					)}
+					{item.status !== "anulado" && (
+						<Popconfirm
+							title="Anular presupuesto"
+							description={`¿Anular el presupuesto ${item.code}? No se podrá modificar.`}
+							okText="Anular"
+							cancelText="Cancelar"
+							okButtonProps={{ danger: true }}
+							onConfirm={() => onAnnul(item)}
+						>
+							<Button danger icon={<BanIcon size={16} />} aria-label={`Anular ${item.code}`} />
+						</Popconfirm>
+					)}
+				</Space>
+			),
 		},
 	];
 
@@ -131,6 +182,11 @@ export function BudgetsTable({ list }: { list: BudgetList }) {
 						style={{ width: 320, maxWidth: "100%" }}
 					/>
 				</Space>
+				<ExportButton
+					href="/budgets/export"
+					params={{ q: list.search, status: list.status }}
+					disabled={list.total === 0}
+				/>
 			</Flex>
 			<Table<BudgetListItem>
 				rowKey="code"

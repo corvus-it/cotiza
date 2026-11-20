@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, between, desc, eq, gte, sql, type SQL } from "drizzle-orm";
+import { and, asc, between, desc, eq, gte, isNull, sql, type SQL } from "drizzle-orm";
 import { ofCompany, TODAY_CL } from "@/lib/budgets/queries";
 import { db } from "@/lib/db";
 import { budgetDetails, budgets, clients, serviceTypes, users, vehicles } from "@/lib/db/schemas";
@@ -90,7 +90,8 @@ export async function getDashboard(companyId: number, period: Period): Promise<D
 				expiringSoon: num(sql`count(*) filter (where ${expiresOn} <= ${TODAY_CL} + ${EXPIRING_DAYS}::int)`),
 			})
 			.from(budgets)
-			.where(and(company, eq(budgets.active, true), gte(expiresOn, TODAY_CL))),
+			// Abiertos: sin anular, sin aceptar y sin vencer.
+			.where(and(company, eq(budgets.active, true), isNull(budgets.acceptedAt), gte(expiresOn, TODAY_CL))),
 
 		db
 			.select({
@@ -197,6 +198,7 @@ export async function getDashboard(companyId: number, period: Period): Promise<D
 				and(
 					company,
 					eq(budgets.active, true),
+					isNull(budgets.acceptedAt),
 					sql`${expiresOn} between ${TODAY_CL} and ${TODAY_CL} + ${EXPIRING_DAYS}::int`,
 				),
 			)

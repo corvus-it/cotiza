@@ -6,6 +6,7 @@ import { PencilIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { ExportButton } from "@/app/components/export-button";
 import { deleteClient } from "@/lib/actions/clients";
 import type { ClientWithVehicles } from "@/lib/clients/queries";
 
@@ -100,6 +101,7 @@ export function ClientsTable({ clients, query }: ClientsTableProps) {
 					onSearch={onSearch}
 					style={{ maxWidth: 360 }}
 				/>
+				<ExportButton href="/clients/export" params={{ q: query }} disabled={clients.length === 0} />
 			</Flex>
 			<Table<ClientRow>
 				rowKey="id"

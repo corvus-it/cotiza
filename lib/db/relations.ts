@@ -24,6 +24,7 @@ export const relations = defineRelations(schema, (r) => ({
 	},
 	companies: {
 		users: r.many.users(),
+		emailLogs: r.many.emailLogs(),
 	},
 	clients: {
 		budgets: r.many.budgets(),
@@ -63,5 +64,14 @@ export const relations = defineRelations(schema, (r) => ({
 			to: r.serviceTypes.id,
 			optional: false,
 		}),
+	},
+	emailLogs: {
+		company: r.one.companies({
+			from: r.emailLogs.companyId,
+			to: r.companies.id,
+			optional: false,
+		}),
+		user: r.one.users({ from: r.emailLogs.userId, to: r.users.id }),
+		budget: r.one.budgets({ from: r.emailLogs.budgetId, to: r.budgets.id }),
 	},
 }));

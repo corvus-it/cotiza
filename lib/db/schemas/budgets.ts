@@ -8,6 +8,7 @@ import {
 	numeric,
 	pgTable,
 	text,
+	timestamp,
 	unique,
 	varchar,
 } from "drizzle-orm/pg-core";
@@ -59,6 +60,9 @@ export const budgets = pgTable(
 		estimatedDeliveryDate: date("estimated_delivery_date"),
 		additionalObservations: text("additional_observations"),
 		active: boolean().default(true).notNull(),
+		// Aceptado por el cliente (ver .harness/sql/008_budgets_accepted.sql). NULL = no aceptado.
+		acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+		acceptedBy: integer("accepted_by").references(() => users.id),
 	},
 	(table) => [
 		unique("budgets_company_id_code_key").on(table.companyId, table.code),

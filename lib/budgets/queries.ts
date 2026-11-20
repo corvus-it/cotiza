@@ -10,6 +10,7 @@ import {
 	budgets,
 	clients,
 	companies,
+	emailLogs,
 	serviceTypes,
 	users,
 	vehicles,
@@ -24,9 +25,34 @@ export const TODAY_CL = sql`(now() AT TIME ZONE 'America/Santiago')::date`;
 const expiresOn = sql<string>`to_char(${budgets.date} + ${budgets.validityDays}, 'YYYY-MM-DD')`;
 const statusSql = sql<BudgetStatus>`CASE
 	WHEN NOT ${budgets.active} THEN 'anulado'
+	WHEN ${budgets.acceptedAt} IS NOT NULL THEN 'aceptado'
 	WHEN ${budgets.date} + ${budgets.validityDays} < ${TODAY_CL} THEN 'vencido'
 	ELSE 'vigente'
 END`;
+
+/**
+ * Último correo ENVIADO (exitoso) del presupuesto, desde `email_logs`.
+ * Subconsultas correlacionadas: se evalúan solo para las filas de la página
+ * (índice `email_logs_budget_id_idx`). Fecha ya en hora de Chile.
+ */
+const lastSent = (column: SQL) =>
+	sql`(SELECT ${column} FROM ${emailLogs}
+		WHERE ${emailLogs.budgetId} = ${budgets.id} AND ${emailLogs.status} = 'sent'
+		ORDER BY ${emailLogs.createdAt} DESC LIMIT 1)`;
+const lastSentAt = sql<string | null>`${lastSent(
+	sql`to_char(${emailLogs.createdAt} AT TIME ZONE 'America/Santiago', 'DD-MM-YYYY HH24:MI')`,
+)}`;
+const lastSentTo = sql<string | null>`${lastSent(sql`${emailLogs.toEmail}`)}`;
+
+/** Fecha de aceptación ("dd-mm-aaaa hh:mm", hora de Chile), o `null`. */
+const acceptedAtCL = sql<string | null>`to_char(${budgets.acceptedAt} AT TIME ZONE 'America/Santiago', 'DD-MM-YYYY HH24:MI')`;
+
+/** Último envío por correo: fecha ("dd-mm-aaaa hh:mm", hora de Chile) y destinatario. */
+export type BudgetLastSent = { at: string; to: string } | null;
+
+function toLastSent(at: string | null, to: string | null): BudgetLastSent {
+	return at && to ? { at, to } : null;
+}
 
 // ---------------------------------------------------------------------------
 // Acceso: los presupuestos son de la empresa del usuario actual.
@@ -68,10 +94,15 @@ export type BudgetListItem = {
 	ivaAmount: number;
 	totalAmount: number;
 	clientName: string;
+	clientRut: string;
 	plate: string;
 	brand: string;
 	model: string;
 	userName: string;
+	clientEmail: string | null;
+	/** Fecha de aceptación (hora de Chile), o `null`. */
+	acceptedAt: string | null;
+	lastSent: BudgetLastSent;
 };
 
 export type BudgetListFilters = {
@@ -133,10 +164,15 @@ export async function getCompanyBudgets(
 			ivaAmount: budgets.ivaAmount,
 			totalAmount: budgets.totalAmount,
 			clientName: clients.name,
+			clientRut: clients.rut,
 			plate: vehicles.plate,
 			brand: vehicles.brand,
 			model: vehicles.model,
 			userName: users.name,
+			clientEmail: clients.email,
+			acceptedAt: acceptedAtCL,
+			lastSentAt,
+			lastSentTo,
 			total: sql<number>`count(*) over ()`.mapWith(Number),
 		})
 		.from(budgets)
@@ -162,10 +198,10 @@ export async function getCompanyBudgets(
 	}
 
 	return {
-		items: rows.map((row) => {
+		items: rows.map(({ lastSentAt: at, lastSentTo: to, ...row }) => {
 			const item: Partial<typeof row> = { ...row };
 			delete item.total; // columna auxiliar del conteo
-			return item as BudgetListItem;
+			return { ...(item as Omit<typeof row, "total">), lastSent: toLastSent(at, to) };
 		}),
 		total,
 		page,
@@ -209,9 +245,15 @@ export type BudgetFull = {
 	userName: string;
 	clientName: string;
 	clientRut: string;
+	clientEmail: string | null;
+	clientPhone: string | null;
 	plate: string;
 	brand: string;
 	model: string;
+	vehicleYear: number | null;
+	/** Fecha de aceptación (hora de Chile) si `status` es «aceptado». */
+	acceptedAt: string | null;
+	lastSent: BudgetLastSent;
 	lines: BudgetDetailLine[];
 };
 
@@ -241,9 +283,15 @@ export async function getCompanyBudget(companyId: number, code: string): Promise
 			userName: users.name,
 			clientName: clients.name,
 			clientRut: clients.rut,
+			clientEmail: clients.email,
+			clientPhone: clients.phone,
 			plate: vehicles.plate,
 			brand: vehicles.brand,
 			model: vehicles.model,
+			vehicleYear: vehicles.year,
+			acceptedAt: acceptedAtCL,
+			lastSentAt,
+			lastSentTo,
 		})
 		.from(budgets)
 		.innerJoin(users, eq(users.id, budgets.userId))
@@ -252,7 +300,7 @@ export async function getCompanyBudget(companyId: number, code: string): Promise
 		.where(and(eq(budgets.code, code), ofCompany(companyId)))
 		.limit(1);
 	if (!row) return null;
-	const { id, ...budget } = row;
+	const { id, lastSentAt: at, lastSentTo: to, ...budget } = row;
 
 	const lines = await db
 		.select({
@@ -266,7 +314,7 @@ export async function getCompanyBudget(companyId: number, code: string): Promise
 		.where(eq(budgetDetails.budgetId, id))
 		.orderBy(asc(budgetDetails.id));
 
-	return { ...budget, lines };
+	return { ...budget, lastSent: toLastSent(at, to), lines };
 }
 
 // ---------------------------------------------------------------------------
